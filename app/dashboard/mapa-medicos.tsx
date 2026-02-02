@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import type { DivIcon } from "leaflet";
+import type { DivIcon, LatLngTuple } from "leaflet";
 
 const API = process.env.NEXT_PUBLIC_API_BASE!;
 
 /* ================================
-   IMPORTS REACT-LEAFLET (SIN SSR)a
+   IMPORTS REACT-LEAFLET (SIN SSR)
 ================================ */
 const MapContainer = dynamic(
   () => import("react-leaflet").then((m) => m.MapContainer),
@@ -49,33 +49,65 @@ export default function MapaMedicos() {
   const [medicoIcon, setMedicoIcon] = useState<DivIcon | null>(null);
   const [enfermeroIcon, setEnfermeroIcon] = useState<DivIcon | null>(null);
 
-  // asegurar DOM
+  /* asegurar DOM */
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // cargar profesionales conectados (backend decide)
+  /* crear iconos (client only) */
+  useEffect(() => {
+    if (!mounted) return;
+
+    import("leaflet").then((L) => {
+      const medico = L.divIcon({
+        className: "",
+        html: `<div style="
+          width:14px;
+          height:14px;
+          border-radius:50%;
+          background:#14B8A6;
+          box-shadow:0 0 0 4px rgba(20,184,166,.25);
+        "></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+      });
+
+      const enfermero = L.divIcon({
+        className: "",
+        html: `<div style="
+          width:14px;
+          height:14px;
+          border-radius:50%;
+          background:#3B82F6;
+          box-shadow:0 0 0 4px rgba(59,130,246,.25);
+        "></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+      });
+
+      setMedicoIcon(medico);
+      setEnfermeroIcon(enfermero);
+    });
+  }, [mounted]);
+
+  /* cargar profesionales */
   useEffect(() => {
     if (!mounted) return;
 
     const load = () =>
       fetch(`${API}/monitoreo/profesionales_conectados`)
         .then((r) => r.json())
-        .then((d) => {
-          if (d.ok) {
-            setProfesionales(d.profesionales || []);
-          } else {
-            setProfesionales([]);
-          }
-        })
+        .then((d) =>
+          d.ok ? setProfesionales(d.profesionales || []) : setProfesionales([])
+        )
         .catch(() => setProfesionales([]));
 
     load();
-    const i = setInterval(load, 10000); // cada 10s
+    const i = setInterval(load, 10000);
     return () => clearInterval(i);
   }, [mounted]);
 
-  if (!mounted) {
+  if (!mounted || !medicoIcon || !enfermeroIcon) {
     return (
       <div className="h-[420px] flex items-center justify-center text-white/60">
         Cargando mapa…
@@ -107,7 +139,7 @@ export default function MapaMedicos() {
           {profesionales.map((p) => (
             <Marker
               key={p.id}
-              position={[p.lat, p.lng]}
+              position={[p.lat, p.lng] as LatLngTuple}
               icon={p.tipo === "medico" ? medicoIcon : enfermeroIcon}
             >
               <Popup>
@@ -137,7 +169,6 @@ export default function MapaMedicos() {
         </MapContainer>
       </div>
 
-      {/* TABLA */}
       <TablaProfesionales data={profesionales} />
     </div>
   );
