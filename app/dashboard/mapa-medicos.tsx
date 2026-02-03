@@ -90,20 +90,39 @@ export default function MapaMedicos() {
     });
   }, [mounted]);
 
-  /* cargar profesionales */
+  /* ================================
+     CARGA DESDE DB (MONITOREO REAL)
+     SIN RADIO / SIN DISTANCIA
+  ================================ */
   useEffect(() => {
     if (!mounted) return;
 
     const load = () =>
-      fetch(`${API}/monitoreo/profesionales_conectados`)
+      fetch(`${API}/monitoreo/medicos_mapa`)
         .then((r) => r.json())
-        .then((d) =>
-          d.ok ? setProfesionales(d.profesionales || []) : setProfesionales([])
-        )
+        .then((d) => {
+          if (!d.ok) {
+            setProfesionales([]);
+            return;
+          }
+
+          setProfesionales(
+            (d.profesionales || []).map((p: any) => ({
+              id: p.id,
+              nombre: p.nombre,
+              lat: p.latitud,
+              lng: p.longitud,
+              tipo: p.tipo,
+              telefono: p.telefono ?? "",
+              matricula: p.matricula,
+              especialidad: p.tipo === "medico" ? "Médico" : "Enfermero",
+            }))
+          );
+        })
         .catch(() => setProfesionales([]));
 
     load();
-    const i = setInterval(load, 10000);
+    const i = setInterval(load, 15000);
     return () => clearInterval(i);
   }, [mounted]);
 
@@ -194,6 +213,14 @@ function Legend({ color, label }: { color: string; label: string }) {
 }
 
 function TablaProfesionales({ data }: { data: Profesional[] }) {
+  if (!data.length) {
+    return (
+      <div className="text-sm text-white/60">
+        No hay profesionales activos con ubicación.
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-lg border border-white/10 overflow-hidden">
       <table className="w-full text-xs md:text-sm text-white">
